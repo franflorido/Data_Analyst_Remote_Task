@@ -73,11 +73,11 @@ def data_preprocesing(data_df):
     data_df = pd.merge(data_df, attributes_df, how='inner', left_on = 'ID', right_on = 'ID')
     data_df.set_index(['ID'])
     data_df_1 = data_df.drop(columns=['Attribute_Names', 'Attribute_Values'])
-    data_df_2 = data_df_1.drop_duplicates(subset='ID', keep='first')
+    data_df_1 = data_df_1.drop_duplicates(subset='ID', keep='first')
 
     # Removing the part of ModelText column to ModelTypeText to obtain desired attribute
-    data_df_2['ModelTypeText'] = data_df_2['ModelTypeText'].str.upper()
-    data_df_2['ModelTypeText'] = [e.replace(k, '') for e, k in zip(data_df_2.ModelTypeText.astype('str'), data_df_2.ModelText.astype('str'))]
+    data_df_1['ModelTypeText'] = data_df_1['ModelTypeText'].str.upper()
+    data_df_1['ModelTypeText'] = [e.replace(k, '') for e, k in zip(data_df_1.ModelTypeText.astype('str'), data_df_1.ModelText.astype('str'))]
 
     # Obtaining Country, currency and zip for each one of the cities in the dataset
     city_list = data_df.City.unique().tolist()
@@ -99,42 +99,42 @@ def data_preprocesing(data_df):
     city_country_dict = dict(zip(city_list, country_list))
     city_currency_dict = dict(zip(city_list, currency_list))
     city_zip_dict = dict(zip(city_list, zip_list))
-    data_df_2['country']= data_df_2['City'].map(city_country_dict)
-    data_df_2['zip']= data_df_2['City'].map(city_zip_dict)
-    data_df_2['currency']= data_df_2['City'].map(city_currency_dict)
+    data_df_1['country']= data_df_1['City'].map(city_country_dict)
+    data_df_1['zip']= data_df_1['City'].map(city_zip_dict)
+    data_df_1['currency']= data_df_1['City'].map(city_currency_dict)
 
     # type column creation
-    data_df_2['type'] = np.where(~data_df_2['BodyTypeText'].isnull(),'car','null')
+    data_df_1['type'] = np.where(~data_df_1['BodyTypeText'].isnull(),'car','null')
 
     # Editing ConsumptionTotalText column to get the desired format
-    for i in data_df_2.index:
-        s = data_df_2.loc[i,'ConsumptionTotalText']
+    for i in data_df_1.index:
+        s = data_df_1.loc[i,'ConsumptionTotalText']
         x = s.split('/')
         if (s is not None) & (len(x) > 1) :
             # split string by "/" and keep only letters
             r1 = re.sub(r'[^a-zA-Z]', '', x[0])
             r2 = re.sub(r'[^a-zA-Z]', '', x[1])
-            data_df_2.loc[i,'ConsumptionTotalText'] = r1+'_'+r2+'_consumption'
+            data_df_1.loc[i,'ConsumptionTotalText'] = r1+'_'+r2+'_consumption'
        
     # Fix to include ml and km into mileage_unit and mileage
-    columns = data_df_2.columns.tolist()
+    columns = data_df_1.columns.tolist()
     if ('ml' not in columns) & ('Km' in columns):
-        data_df_2['mileage_unit'] = 'kilometer'
+        data_df_1['mileage_unit'] = 'kilometer'
     elif ('ml' in columns) & ('Km' not in columns):
-        data_df_2['mileage_unit'] = 'mile'
+        data_df_1['mileage_unit'] = 'mile'
     else:
-        data_df_2['mileage_unit'] = 'kilometer'
-        mask = data_df_2['Km'].isnull()
-        data_df_2.loc[mask, 'mileage_unit'] = 'mile'
-        value = data_df_2.loc[mask, 'ml']
-        data_df_2.loc[mask, 'Km'] = value
+        data_df_1['mileage_unit'] = 'kilometer'
+        mask = data_df_1['Km'].isnull()
+        data_df_1.loc[mask, 'mileage_unit'] = 'mile'
+        value = data_df_1.loc[mask, 'ml']
+        data_df_1.loc[mask, 'Km'] = value
 
     # Asigning the desired data type to the columns
-    data_df_2['Km'] = data_df_2['Km'].astype(float)
-    data_df_2['FirstRegMonth'] = data_df_2['FirstRegMonth'].astype(float)
-    data_df_2['FirstRegYear'] = data_df_2['FirstRegYear'].astype('int64')
+    data_df_1['Km'] = data_df_1['Km'].astype(float)
+    data_df_1['FirstRegMonth'] = data_df_1['FirstRegMonth'].astype(float)
+    data_df_1['FirstRegYear'] = data_df_1['FirstRegYear'].astype('int64')
 
-    return data_df_2
+    return data_df_1
 
 def data_normalization(dic_1,dic_2,data_df_2):
     '''
@@ -142,10 +142,11 @@ def data_normalization(dic_1,dic_2,data_df_2):
     '''
     
     # Normalize columns
-    data_df_2['ConditionTypeText']= data_df_2['ConditionTypeText'].map(dic_1)
-    data_df_2['type']= data_df_2['type'].map(dic_2)
+    data_df = data_df_2.copy()
+    data_df['ConditionTypeText']= data_df['ConditionTypeText'].map(dic_1)
+    data_df['type']= data_df['type'].map(dic_2)
 
-    return data_df_2
+    return data_df
 
 def data_integration(data_df_2, target_df):
     '''
@@ -175,16 +176,15 @@ def data_integration(data_df_2, target_df):
 
     return data_df_2
 
-def export_to_excel(data_df_1, data_df_2, data_df_3, path):
+def export_to_excel(data_df, data_df_2, data_df_3, path):
     '''
         Function to export data to excel file
     '''
-    
+
     # create a excel writer object
-    with pd.ExcelWriter(path) as writer:
-        
-        # Export data
-        data_df_1.to_excel(writer, sheet_name="Pre-processing", index=False)
+    with pd.ExcelWriter(path, engine='xlsxwriter') as writer:
+
+        data_df.to_excel(writer, sheet_name="Pre-processing", index=False)
         data_df_2.to_excel(writer, sheet_name="Normalization", index=False)
         data_df_3.to_excel(writer, sheet_name="Integration", index=False)
 
